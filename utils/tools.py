@@ -15,7 +15,7 @@ from collections import defaultdict
 from tqdm import tqdm
 
 # From other files
-from params import *
+# from params import *
 from .stats import *
 
 
@@ -246,56 +246,82 @@ def filter_subjects_by_fd(pheno_filtered_qc, derivatives_p):
     
     return pheno_filtered_fd_mean_max
 
-def process_connectivity_matrix(pheno_filtered_fd, feature, atlas, connectome_p, conn_mask):
+import json
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+
+def process_connectivity_matrix(pheno_filtered_fd, feature, derivatives_path, conn_mask):
     """
-    Process connectivity matrices for valid subjects
+    Process connectivity matrices for valid subjects and extract FDMean from timeseries JSON files.
     
     Args:
         pheno_filtered_fd (pd.DataFrame): Filtered phenotype data with FD < 0.5
         feature (str): Feature name
-        atlas (str): Atlas name
-        connectome_p (str): Path to connectome directory
+        derivatives_path (Path): Path to derivatives/halfpipe/
         conn_mask (array): Mask for connectome data
     
     Returns:
-        tuple: (conn_stack, pheno_filtered_fd)
+        tuple: (conn_stack, updated_pheno)
     """
     print("Process connectivity matrices for valid subjects ...")
 
-    connectome_t, _ = check_path()
-
-    # Collect valid connectome paths
     valid_subject_paths = []
     valid_subject_indices = []
-    
-    for index, subject in tqdm(pheno_filtered_fd.iterrows()):
-        connectome_file = glob.glob(os.path.join(connectome_p, connectome_t.format(
-            subject['participant_id'],subject['participant_id'], feature, atlas
-        )))
-        
-        for file in connectome_file : 
-            if os.path.exists(file):  # Check if file exists
-                valid_subject_paths.append(file)
-                valid_subject_indices.append(index)  # Store index of valid subjects
- 
-    # Stack connectome data
-    conn_stack = np.array([pd.read_csv(p, sep='\t', header=None).values[conn_mask] for p in valid_subject_paths])
-    
-    # Get statistics
-    stats = {
-        'subjects': len(pheno_filtered_fd),
-        'valid_connectome': len(valid_subject_paths)
-    }
-    
-    print(f"\nProcessing statistics for feature {feature} with atlas {atlas}:")
-    
+    fdmean_values = []     # <--- store FDMean values
+
+    for idx, row in tqdm(pheno_filtered_fd.iterrows(), total=len(pheno_filtered_fd)):
+        subj = row["participant_id"]
+
+        # Find correlation matrix file
+        corr_pat = f"{subj}_*feature-{feature}_*desc-correlation_matrix.tsv"
+        corr_files = list(derivatives_path.rglob(corr_pat))
+
+        if not corr_files:
+            fdmean_values.append(np.nan)
+            continue
+
+        # Add the found connectome file
+        valid_subject_paths.append(str(corr_files[0]))
+        valid_subject_indices.append(idx)
+
+        # ---- Find the corresponding JSON file ----
+        json_pat = f"{subj}_*feature-{feature}_*_timeseries.json"
+        json_files = list(derivatives_path.rglob(json_pat))
+
+        if json_files:
+            try:
+                with open(json_files[0], "r") as f:
+                    metadata = json.load(f)
+                fdmean_values.append(metadata.get("FDMean", np.nan))
+            except Exception as e:
+                print(f"Warning: could not read JSON for {subj}: {e}")
+                fdmean_values.append(np.nan)
+        else:
+            fdmean_values.append(np.nan)
+
+    # Add FDMean column to phenotype table
+    pheno_filtered_fd = pheno_filtered_fd.copy()
+    pheno_filtered_fd["mean_fd"] = fdmean_values
+
+    # ---- Stack connectomes ----
+    conn_stack = np.array([
+        pd.read_csv(p, sep="\t", header=None).values[conn_mask]
+        for p in valid_subject_paths
+    ])
+
+    print(f"\nProcessing statistics for feature {feature}")
+    print(f"Total subjects: {len(pheno_filtered_fd)}")
+    print(f"Subjects with valid connectomes: {len(valid_subject_paths)}")
+
     return conn_stack, pheno_filtered_fd
 
 
-def run_cwas_analysis(json_file_path, pheno_filtered_qc_fd, 
-                      derivatives_p, connectome_p, conn_mask, 
+
+def run_cwas_analysis(feature, pheno_filtered_qc_fd, 
+                      derivatives_path, conn_mask, 
                       roi_labels, out_p, case_name, control_name,
-                      sequence_col, medication_col):
+                      sequence_col, medication_col, atlas="schaeferCombined"):
     """
     Run CWAS analysis for all features defined in the JSON specification
     
@@ -318,23 +344,11 @@ def run_cwas_analysis(json_file_path, pheno_filtered_qc_fd,
     out_p = Path(out_p)
     out_p.mkdir(parents=True, exist_ok=True)
     
-    # Extract feature settings and validate atlases
-    try:
-        feature_settings, common_atlas = extract_feature_settings(json_file_path)
-        
-        if common_atlas:
-            print(f"\nUsing common atlas: {common_atlas}")
-        else:
-            print("\nNo atlas-based connectivity features found")
-            
-    except ValueError as e:
-        print(f"Error processing features: {str(e)}")
-        sys.exit(1)    
     
     # Define regressors
-    list_regressor = ['age', 'C(sex)', 'mean_fd', 'C(scanner)']
+    list_regressor = ['age', 'C(gender)', 'mean_fd']
     if sequence_col :
-        list_regressor.append('C(sequence)')
+        list_regressor.append(f'C({sequence_col})')
     if medication_col  :
         list_regressor.append('C(medication)')
         
@@ -342,35 +356,37 @@ def run_cwas_analysis(json_file_path, pheno_filtered_qc_fd,
     print(f'\nregressors used in the model: {regressors}')
     
     # Process each feature
-    for feature in tqdm(feature_settings):
-        print(f"\nProcessing feature: {feature}")
-        
-        # Process connectivity matrix
-        conn_stack, final_df = process_connectivity_matrix(
-            pheno_filtered_fd=pheno_filtered_qc_fd,
-            feature=feature,
-            atlas=common_atlas,
-            connectome_p=connectome_p,
-            conn_mask=conn_mask
-        )
-        
-        # Perform CWAS analysis
-        glm_con = glm_wrap_cc(conn_stack, final_df, 
-                             group='diagnosis', case=1, control=0, 
-                             regressors=regressors, report=True)
-        
-        # Get results
-        table_con, table_stand_beta_con, table_qval_con = summarize_glm(
-            glm_con, conn_mask, roi_labels
-        )
-        
-        # Save results
-        base_filename = f'cwas_{case_name}_{control_name}_rsfmri_{feature}_{common_atlas}'
-        table_con.to_csv(out_p / f'{base_filename}.tsv', sep='\t')
-        table_stand_beta_con.to_csv(out_p / f'{base_filename}_standardized_betas.tsv', sep='\t')
-        table_qval_con.to_csv(out_p / f'{base_filename}_fdr_corrected_pvalues.tsv', sep='\t')
-        
-        print(f"Completed processing for feature: {feature}")
+    print(f"\nProcessing feature: {feature}")
     
+    # Process connectivity matrix
+    conn_stack, final_df = process_connectivity_matrix(
+        pheno_filtered_fd=pheno_filtered_qc_fd,
+        feature=feature,
+        derivatives_path=derivatives_path,
+        conn_mask=conn_mask
+    )
+
+    # Rename case and control with 1 and o
+    final_df = final_df.copy()
+    final_df['diagnosis'] = final_df['diagnosis'].replace({case_name: 1, control_name: 0})
+         
+    # Perform CWAS analysis
+    glm_con = glm_wrap_cc(conn_stack, final_df, 
+                            group='diagnosis', case=1, control=0, 
+                            regressors=regressors, report=True)
+    
+    # Get results
+    table_con, table_stand_beta_con, table_qval_con = summarize_glm(
+        glm_con, conn_mask, roi_labels
+    )
+    
+    # Save results
+    base_filename = f'cwas_{case_name}_{control_name}_rsfmri_{feature}_{atlas}'
+    table_con.to_csv(out_p / f'{base_filename}.tsv', sep='\t')
+    table_stand_beta_con.to_csv(out_p / f'{base_filename}_standardized_betas.tsv', sep='\t')
+    table_qval_con.to_csv(out_p / f'{base_filename}_fdr_corrected_pvalues.tsv', sep='\t')
+    
+    print(f"Completed processing for feature: {feature}")
+
     print("\nAnalysis complete. Results saved to:")
     print(out_p)
