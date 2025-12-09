@@ -35,7 +35,7 @@ if __name__ == "__main__":
     conn_mask = np.tril(np.ones((len(labels),len(labels)))).astype(bool)
     roi_labels = labels[1].to_list()
 
-    pheno_filtered_qc_fd = pd.read_csv(args.pheno_filtered_path, sep='\t')
+    pheno_filtered_qc_fd = pd.read_csv(args.pheno_filtered_path, sep='\t', dtype={"participant_id": str})
 
     # Here you would add the actual analysis code
     # For example:
@@ -49,7 +49,7 @@ if __name__ == "__main__":
                                 control_name=args.control_name,
                                 sequence_col=args.sequence_col, 
                                 medication_col=args.medication_col, 
-                                atlas="schaeferCombined")
+                                atlas="schaefercombined")
     
 
     # save_results(results, args.output)

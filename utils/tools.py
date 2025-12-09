@@ -14,6 +14,11 @@ from pathlib import Path
 from collections import defaultdict
 from tqdm import tqdm
 
+import json
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+
 # From other files
 # from params import *
 from .stats import *
@@ -246,10 +251,6 @@ def filter_subjects_by_fd(pheno_filtered_qc, derivatives_p):
     
     return pheno_filtered_fd_mean_max
 
-import json
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
 
 def process_connectivity_matrix(pheno_filtered_fd, feature, derivatives_path, conn_mask):
     """
@@ -271,8 +272,12 @@ def process_connectivity_matrix(pheno_filtered_fd, feature, derivatives_path, co
     fdmean_values = []     # <--- store FDMean values
 
     for idx, row in tqdm(pheno_filtered_fd.iterrows(), total=len(pheno_filtered_fd)):
-        subj = row["participant_id"]
-
+        subj = str(row["participant_id"])
+        
+        # Normalize: ensure it starts with "sub-"
+        if not subj.startswith("sub-"):
+            subj = f"sub-{subj}"
+            
         # Find correlation matrix file
         corr_pat = f"{subj}_*feature-{feature}_*desc-correlation_matrix.tsv"
         corr_files = list(derivatives_path.rglob(corr_pat))
@@ -314,8 +319,13 @@ def process_connectivity_matrix(pheno_filtered_fd, feature, derivatives_path, co
     print(f"Total subjects: {len(pheno_filtered_fd)}")
     print(f"Subjects with valid connectomes: {len(valid_subject_paths)}")
 
-    return conn_stack, pheno_filtered_fd
+    # ---- Filter phenotype table so we keep ONLY subjects with connectomes ----
+    pheno_filtered_fd = pheno_filtered_fd.loc[valid_subject_indices].reset_index(drop=True)
+    pheno_filtered_fd["mean_fd"] = [
+        fdmean_values[i] for i in valid_subject_indices
+    ]
 
+    return conn_stack, pheno_filtered_fd
 
 
 def run_cwas_analysis(feature, pheno_filtered_qc_fd, 
