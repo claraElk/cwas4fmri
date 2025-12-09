@@ -273,38 +273,58 @@ def process_connectivity_matrix(pheno_filtered_fd, feature, derivatives_path, co
 
     for idx, row in tqdm(pheno_filtered_fd.iterrows(), total=len(pheno_filtered_fd)):
         subj = str(row["participant_id"])
-        
+    
         # Normalize: ensure it starts with "sub-"
         if not subj.startswith("sub-"):
             subj = f"sub-{subj}"
-            
-        # Find correlation matrix file
+    
+        # ---- Find all correlation matrices for this subject ----
         corr_pat = f"{subj}_*feature-{feature}_*desc-correlation_matrix.tsv"
         corr_files = list(derivatives_path.rglob(corr_pat))
-
+    
         if not corr_files:
             fdmean_values.append(np.nan)
             continue
-
-        # Add the found connectome file
+    
+        # ---- Load and average correlation matrices ----
+        matrices = []
+        for cf in corr_files:
+            mat = pd.read_csv(cf, sep="\t", index_col=0)
+            matrices.append(mat)
+    
+        # Compute the average matrix
+        if len(matrices) > 1:
+            print("Average connectomes for", subj)
+            avg_mat = sum(matrices) / len(matrices)
+        else:
+            avg_mat = matrices[0]
+    
+        # Save it somewhere (if needed)
+        # You can store the averaged matrix so the rest of your pipeline uses only ONE
+        # Here we just append the path of the first file, but you may want to change that
         valid_subject_paths.append(str(corr_files[0]))
         valid_subject_indices.append(idx)
-
-        # ---- Find the corresponding JSON file ----
+    
+        # ---- JSON metadata for FDMean ----
         json_pat = f"{subj}_*feature-{feature}_*_timeseries.json"
         json_files = list(derivatives_path.rglob(json_pat))
-
-        if json_files:
+    
+        # If multiple JSON files exist, average FDMean too
+        fd_values = []
+        for jf in json_files:
             try:
-                with open(json_files[0], "r") as f:
+                with open(jf, "r") as f:
                     metadata = json.load(f)
-                fdmean_values.append(metadata.get("FDMean", np.nan))
+                if "FDMean" in metadata:
+                    fd_values.append(metadata["FDMean"])
             except Exception as e:
                 print(f"Warning: could not read JSON for {subj}: {e}")
-                fdmean_values.append(np.nan)
+    
+        if fd_values:
+            fdmean_values.append(np.mean(fd_values))
         else:
             fdmean_values.append(np.nan)
-
+            
     # Add FDMean column to phenotype table
     pheno_filtered_fd = pheno_filtered_fd.copy()
     pheno_filtered_fd["mean_fd"] = fdmean_values
