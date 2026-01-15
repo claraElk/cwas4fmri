@@ -6,7 +6,6 @@ import numpy as np
 from pathlib import Path
 from utils.tools import run_cwas_analysis
 
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run CWAS Analysis")
@@ -18,8 +17,8 @@ if __name__ == "__main__":
     parser.add_argument("--case_name", type=str, required=True, help="Name of the case group")
     parser.add_argument("--control_name", type=str, required=True, help="Name of the control group")
     parser.add_argument("--sequence_col", type=str, required=False, help="Column name for sequence data")
-    parser.add_argument("--medication_col", type=str, required=False, help="Column name for medication data")
-    
+    parser.add_argument("--machine_col", type=str, required=False, help="Column name for machine data")
+
     args = parser.parse_args()
     print(f"Results will be saved to {args.out_p}.")
 
@@ -32,24 +31,19 @@ if __name__ == "__main__":
     print(f"Results will be saved to {args.out_p}.")
     
     labels = pd.read_csv(args.atlas_file, sep='\t', header=None)
-    conn_mask = np.tril(np.ones((len(labels),len(labels)))).astype(bool)
     roi_labels = labels[1].to_list()
-
-    pheno_filtered_qc_fd = pd.read_csv(args.pheno_filtered_path, sep='\t', dtype={"participant_id": str})
-
-    # Here you would add the actual analysis code
-    # For example:
-    results = run_cwas_analysis(feature=args.feature_settings, 
-                                pheno_filtered_qc_fd=pheno_filtered_qc_fd, 
-                                derivatives_path=Path(args.derivatives_path), 
-                                conn_mask=conn_mask, 
-                                roi_labels=roi_labels, 
-                                out_p=args.out_p, 
-                                case_name=args.case_name, 
-                                control_name=args.control_name,
-                                sequence_col=args.sequence_col, 
-                                medication_col=args.medication_col, 
-                                atlas="schaefercombined")
     
-
-    # save_results(results, args.output)
+    pheno_filtered_qc_fd = pd.read_csv(args.pheno_filtered_path, sep='\t', dtype={"participant_id": str})
+    
+    results = run_cwas_analysis(
+        feature=args.feature_settings, 
+        pheno_filtered_qc_fd=pheno_filtered_qc_fd, 
+        derivatives_path=Path(args.derivatives_path), 
+        roi_labels=roi_labels, 
+        out_p=args.out_p, 
+        case_name=args.case_name, 
+        control_name=args.control_name,
+        sequence_col=args.sequence_col, 
+        machine_col=args.machine_col, 
+        atlas="yeo2011"
+    )
