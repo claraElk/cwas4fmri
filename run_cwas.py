@@ -18,6 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("--control_name", type=str, required=True, help="Name of the control group")
     parser.add_argument("--sequence_col", type=str, required=False, help="Column name for sequence data")
     parser.add_argument("--machine_col", type=str, required=False, help="Column name for machine data")
+    parser.add_argument("--atlas", type=str, required=True, help="Atlas name")
 
     args = parser.parse_args()
     print(f"Results will be saved to {args.out_p}.")
@@ -45,5 +46,5 @@ if __name__ == "__main__":
         control_name=args.control_name,
         sequence_col=args.sequence_col, 
         machine_col=args.machine_col, 
-        atlas="yeo2011"
+        atlas=args.atlas
     )
