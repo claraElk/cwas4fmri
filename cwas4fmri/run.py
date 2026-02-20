@@ -1,11 +1,9 @@
-import os
 import sys
 import argparse
-import pandas as pd
-import numpy as np
 
 from pathlib import Path
-from .worklfow import workflow
+from .workflow import workflow
+
 
 def global_parser():
     """Create and return argument parser for CWAS analysis."""
@@ -16,7 +14,8 @@ def global_parser():
         "bids_dir",
         action="store",
         type=Path,
-        help="The directory with the input dataset (e.g. fMRIPrep derivative)formatted according to the BIDS standard",
+        help="The directory with the input dataset "
+        "(e.g. fMRIPrep derivative) formatted according to the BIDS standard",
     )
     parser.add_argument(
         "output_dir",
@@ -26,7 +25,8 @@ def global_parser():
     )
     parser.add_argument(
         "analysis_level",
-        help="Level of the analysis that will be performed. Only group level is available",
+        help="Level of the analysis that will be performed. "
+        "Only group level is available",
         choices=["group"],
     )
     parser.add_argument(
@@ -40,21 +40,45 @@ def global_parser():
         type=int,
         nargs=1,
     )
-    parser.add_argument("--strategy", type=str, required=True, help="Strategy name")
-    parser.add_argument("--phenotype", type=str, required=True, help="Path to phenotype file after QC")
+    parser.add_argument(
+        "--strategy", type=str, required=True, help="Strategy name"
+    )
+    parser.add_argument(
+        "--phenotype",
+        type=str,
+        required=True,
+        help="Path to phenotype file after QC",
+    )
     parser.add_argument("--atlas", type=str, required=True, help="Atlas name")
-    parser.add_argument("--atlas_file", type=str, required=True, help="Path to ROI labels file")
-    parser.add_argument("--patient", type=str, required=True, help="Name of the case group")
-    parser.add_argument("--control", type=str, required=True, help="Name of the control group")
-    parser.add_argument("--categorical_covariates", type=str, required=False, help="Columns with categorical covariates to include in the model, separated by commas")
-    parser.add_argument("--numerical_covariates", type=str, required=False, help="Columns with numerical covariates to include in the model, separated by commas")
-    
+    parser.add_argument(
+        "--atlas_file", type=str, required=True, help="Path to ROI labels file"
+    )
+    parser.add_argument(
+        "--patient", type=str, required=True, help="Name of the case group"
+    )
+    parser.add_argument(
+        "--control", type=str, required=True, help="Name of the control group"
+    )
+    parser.add_argument(
+        "--categorical_covariates",
+        type=str,
+        required=False,
+        help="Columns with categorical covariates, separated by commas",
+    )
+    parser.add_argument(
+        "--numerical_covariates",
+        type=str,
+        required=False,
+        help="Columns with numerical covariates, separated by commas",
+    )
+
     return parser
 
 
 def main(argv=None):
     args = global_parser().parse_args(argv)
     workflow(args)
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
