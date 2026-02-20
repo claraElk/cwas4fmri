@@ -30,7 +30,7 @@ def workflow(args):
 
     logger.info(
         f"Run CWAS analysis for :"
-        "\n-strategy {args.strategy}"
+        f"\n-strategy {args.strategy}"
         f"\n-atlas: {args.atlas}"
         f"\n-patient group: {args.patient}"
         f"\n-control group: {args.control}"
@@ -76,6 +76,7 @@ def workflow(args):
     )
 
     # Get results
+    # TODO: change this with table list or dict
     (
         table_con,
         table_stand_beta_con,
