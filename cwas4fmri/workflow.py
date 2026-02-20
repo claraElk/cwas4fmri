@@ -11,17 +11,7 @@ def workflow(args):
     Run CWAS analysis for all features defined in the JSON specification
 
     Args:
-        feature (str): Pipeline name (as indicated in HALFpipe filename)
-        phenotype (pd.DataFrame): Filtered phenotype data (only good subjects)
-        derivatives_p (str): Path to derivatives directory
-        roi_labels (list): List of ROI labels
-        output (str): Output directory path
-        patient (str): case variable as indicated in phenotype file
-        control (str): control group variable as indicated in phenotype file
-        cat_covariates (str): list of categorical covariates
-        num_covariates (str): list of numerical covariates
-        atlas (str): name of the atlas, as indicated in HALFpipe filename.
-            - Default: schaeferCombined
+        args (argparse.Namespace): Arguments parsed from the global parser
 
     Returns:
         None
@@ -30,7 +20,7 @@ def workflow(args):
 
     logger.info(
         f"Run CWAS analysis for :"
-        f"\n-strategy {args.strategy}"
+        f"\n-strategy: {args.strategy}"
         f"\n-atlas: {args.atlas}"
         f"\n-patient group: {args.patient}"
         f"\n-control group: {args.control}"
@@ -48,6 +38,7 @@ def workflow(args):
     if args.categorical_covariates:
         for cov in args.categorical_covariates.split(","):
             list_regressor.append(f"C({cov.strip()})")
+
     if args.numerical_covariates:
         for cov in args.numerical_covariates.split(","):
             list_regressor.append(cov.strip())
@@ -76,14 +67,7 @@ def workflow(args):
     )
 
     # Get results
-    # TODO: change this with table list or dict
-    (
-        table_con,
-        table_stand_beta_con,
-        table_qval_con,
-        table_pval_con,
-        table_beta_con,
-    ) = summarize_glm(glm_con, mask_2d, roi_labels)
+    results = summarize_glm(glm_con, mask_2d, roi_labels)
 
     # Save results
     base_filename = (
@@ -91,15 +75,19 @@ def workflow(args):
         f"_feature-{args.strategy}_atlas-{args.atlas}_desc-cwas"
     )
 
-    table_con.to_csv(output / f"{base_filename}.tsv", sep="\t")
-    table_stand_beta_con.to_csv(
+    results["out_table"].to_csv(output / f"{base_filename}.tsv", sep="\t")
+    results["stand_beta_table"].to_csv(
         output / f"{base_filename}_standardized_betas.tsv", sep="\t"
     )
-    table_qval_con.to_csv(
+    results["qval_table"].to_csv(
         output / f"{base_filename}_fdr_corrected_pvalues.tsv", sep="\t"
     )
-    table_pval_con.to_csv(output / f"{base_filename}_pvalues.tsv", sep="\t")
-    table_beta_con.to_csv(output / f"{base_filename}_betas.tsv", sep="\t")
+    results["pval_table"].to_csv(
+        output / f"{base_filename}_pvalues.tsv", sep="\t"
+    )
+    results["beta_table"].to_csv(
+        output / f"{base_filename}_betas.tsv", sep="\t"
+    )
 
     logger.info(
         f"Completed processing for the following strategy: {args.strategy}"
