@@ -3,6 +3,7 @@ import argparse
 
 from pathlib import Path
 from .workflow import workflow
+from .logger import logger
 
 
 def global_parser():
@@ -71,13 +72,22 @@ def global_parser():
         required=False,
         help="Columns with numerical covariates, separated by commas",
     )
+    parser.add_argument("--debug", action="store_true", default=False)
 
     return parser
 
 
 def main(argv=None):
     args = global_parser().parse_args(argv)
-    workflow(args)
+
+    try:
+        workflow(args)
+    except Exception as e:
+        logger.exception("Exception: %s", e, exc_info=True)
+        if args.debug:
+            import pdb
+
+            pdb.post_mortem()
 
 
 if __name__ == "__main__":
