@@ -55,6 +55,18 @@ def summarize_glm(
     Summarize GLM results:
     - Converts flattened upper-triangle edges back to full square matrix
     - Computes FDR q-values
+    Args:
+        glm_table (pd.DataFrame): DataFrame with results for each edge
+        mask_2d (np.ndarray): Indicating upper-triangle positions
+        labels (list): List of ROI labels
+
+    Returns:
+        dict: Dictionary containing:
+            - out_table: Original glm_table with added 'qval' column
+            - beta_table: DataFrame of full square matrix of betas
+            - stand_beta_table: DataFrame of standardized betas
+            - pval_table: DataFrame of full square matrix of p-values
+            - qval_table: DataFrame of full square matrix of q-values
     """
 
     out_table = glm_table.copy()
@@ -88,7 +100,14 @@ def summarize_glm(
         conn2mat(out_table.qval.values, mask_2d), index=labels, columns=labels
     )
 
-    return out_table, stand_beta_table, qval_table, pval_table, beta_table
+    results = {
+        "out_table": out_table,
+        "stand_beta_table": stand_beta_table,
+        "qval_table": qval_table,
+        "pval_table": pval_table,
+        "beta_table": beta_table,
+    }
+    return results
 
 
 def average_runs(corr_files: list) -> np.ndarray:
@@ -126,6 +145,10 @@ def process_connectivity_matrix(
             - Columns age, gender and diagnosis are mandatory
         feature (str): pipeline name
         derivative_path (str): path to HALFpipe derivatives
+    Returns:
+        conn_stack (np.ndarray): 2D array of shape (n_subjects, n_edges)
+        phenotype (pd.DataFrame): Updated phenotype dataframe and added mean FD
+        mask_2d (np.ndarray): Positions for reconstructing full matrices
     """
     logger.info("Processing connectivity matrices ...")
 
