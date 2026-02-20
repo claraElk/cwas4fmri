@@ -8,8 +8,8 @@
 #SBATCH --array=0-17   # <-- number of features - 1
 
 list_features=(
-  'Baseline' 
-  'Wang2023Simple' 
+  'Baseline'
+  'Wang2023Simple'
   'Wang2023SimpleGSR'
   'Wang2023ScrubbingGSR'
   'Wang2023Scrubbing'
@@ -34,18 +34,18 @@ echo "Running feature: $feature"
 
 cd path/to/cwas4fmri
 
-module load python/3.11
-virtualenv --no-download $SLURM_TMPDIR/env
-source $SLURM_TMPDIR/env/bin/activate
-pip install --no-index --upgrade pip
-pip install --no-index nilearn pandas "numpy<2" scipy statsmodels argparse scikit-learn tqdm
+pip install -e .
 
-python run_cwas.py \
-    --feature_settings "$feature" \
-    --pheno_filtered_path path/to/phenotype.tsv \
-    --derivatives_path path/to/derivatives \
-    --atlas_file path/to/atlas.tsv \
-    --out_p path/to/cwas \
-    --case_name "case" \
-    --control_name "Control" \
-    --sequence_col "sequence"
+cwas4fmri bids_dir \
+          output_dir \
+          group \
+          --strategy \
+          --phenotype \
+          --atlas \
+          --atlas_file \
+          --patient \
+          --control \
+          --categorical_covariates \
+          --numerical_covariates \
+          --verbosity \
+          --debug

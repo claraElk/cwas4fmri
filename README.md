@@ -1,13 +1,39 @@
 # 🧠 CWAS for resting-state fMRI
 
-# Edit run_cwas
-1. Change your list of features with the feature name in your halfpipe output
-2. Edit all your path with your user ID
-3. Change your Case and Control variables (based on your participants.tsv file)
-4. Indicate a sequence_col or machine_col if available. Otherwise do not specify these arguments. 
+This workflow is compliant with atlas-based connectomes from HALFpipe v1.3.0 or higher
 
-# participants.tsv file
-- Make sure to have a participant.tsv file with only GOOD subjects (i.e. subjects who have a good QC)
+# How to run cwas4fmri
+1. Create an environment
+2. Install the package:
+```bash
+pip install .
+```
+3. Then run the pipeline
+```bash
+cwas4fmri bids_dir \
+          output_dir \
+          group \
+          --strategy \
+          --phenotype \
+          --atlas \
+          --atlas_file \
+          --patient \
+          --control \
+          --categorical_covariates \
+          --numerical_covariates \
+          --verbosity \
+          --debug
+```
+
+For more details, run `cwas4fmri -h`
+
+# HALFpipe folder and participants.tsv file
+> **Note:** The pipeline processes only subjects present in **both** the phenotype file and the HALFpipe derivatives folder.
+> Ensure both are clean before running:
+> - Subjects absent from the phenotype file will be skipped, even if their connectomes exist.
+> - Subjects with a missing connectome will be excluded from the analysis.
+> *The phenotype file is the reference:* only subjects listed there will be processed.
+
 - Your participants.tsv file need to have the following columns:
 
 | participant_id | diagnosis | gender | age |

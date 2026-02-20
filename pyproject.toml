@@ -14,12 +14,16 @@ dependencies = [
     "scikit-learn>=1.6.1",
     "statsmodels>=0.14.4",
     "tqdm>=4.67.1",
-    "scipy<=1.15.3"
+    "scipy<=1.15.3",
+    "rich>=14.1.0",
 ]
 version = "0.0.1"
 
 [project.scripts]
 cwas4fmri = "cwas4fmri.run:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cwas4fmri", "cwas4fmri.utils"]
 
 [project.optional-dependencies]
 dev = [
