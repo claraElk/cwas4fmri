@@ -11,32 +11,41 @@ from .stats import conn2mat
 from ..logger import logger
 
 
-def reject_fd(
-    json_files: list, phenotype: pd.DataFrame, subj: str
-) -> pd.DataFrame:
+def filter_and_extract_fd(json_files: list, subj: str) -> tuple[float | None]:
     """
-    Extract the mean FD in HALFpipe json file and average through runs
-
+    For a single subject, check FD criteria across all their runs and
+    extract their mean FD value.
     Args:
-        json_files (list): list of path to 1 subject json file(s)
-
+        json_files (list): List of paths to JSON file(s) for this subject.
+        subj (str): Subject identifier.
     Returns:
-        np.float() : averaged mean_fd across runs
+        tuple:
+            - bool: True if subject passes FD criteria, False otherwise.
+            - float | None: Mean FD averaged across runs, or None if excluded.
     """
-
-    exclude_subject = []
+    fdmean_values = []
 
     for jf in json_files:
         with open(jf, "r") as f:
             metadata = json.load(f)
-        if metadata["FDMax"] > 3.0:
-            exclude_subject.append(subj)
-        if metadata["FDMean"] > 0.5:
-            exclude_subject.append(subj)
 
-    return phenotype[
-        ~phenotype.participant_id.isin(exclude_subject)
-    ].reset_index(drop=True)
+        if not metadata:
+            logger.warning(
+                f"Could not read JSON for {subj} at {jf}, excluding"
+            )
+            return None
+
+        if metadata["FDMax"] > 3.0:
+            logger.warning(f"Excluding {subj} based on FD max criteria")
+            return None
+
+        if metadata["FDMean"] > 0.5:
+            logger.warning(f"Excluding {subj} based on FD mean criteria")
+            return None
+
+        fdmean_values.append(metadata["FDMean"])
+
+    return float(np.mean(fdmean_values))
 
 
 def summarize_glm(
@@ -104,30 +113,6 @@ def average_runs(corr_files: list) -> np.ndarray:
     return avg_mat
 
 
-def fd_mean_extraction(json_files: list, subj: str) -> float:
-    """
-    Extract the mean FD in HALFpipe json file and average through runs
-
-    Args:
-        json_files (list): list of path to 1 subject json file(s)
-
-    Returns:
-        np.float() : averaged mean_fd across runs
-    """
-
-    fd_values = []
-
-    for jf in json_files:
-        with open(jf, "r") as f:
-            metadata = json.load(f)
-        if "FDMean" in metadata:
-            fd_values.append(metadata["FDMean"])
-        else:
-            logger.warning(f"Warning: could not read JSON for {subj}")
-
-    return np.mean(fd_values) if fd_values else np.nan
-
-
 def process_connectivity_matrix(
     phenotype: pd.DataFrame, feature: str, derivatives_path: str
 ) -> tuple[np.ndarray, pd.DataFrame, np.ndarray]:
@@ -136,64 +121,81 @@ def process_connectivity_matrix(
     - Averages multiple runs per subject
     - Keeps NaNs
     - Uses upper triangle without diagonal
-
     Args:
         phenotype (pd.DataFrame) : dataframe with only good QC subjects
             - Columns age, gender and diagnosis are mandatory
         feature (str): pipeline name
         derivative_path (str): path to HALFpipe derivatives
     """
-
     logger.info("Processing connectivity matrices ...")
 
-    flattened_matrices = []
-    valid_subject_indices = []
-    fdmean_values = []
+    records = []
 
-    # Reject subjects based on FD
-    json_files = list(
-        Path(derivatives_path).rglob(
-            f"sub-*_feature-{feature}_*_timeseries.json"
-        )
-    )
-    phenotype = reject_fd(
-        json_files=json_files, phenotype=phenotype, subj=None
-    )
-
-    for idx, row in tqdm(phenotype.iterrows(), total=len(phenotype)):
+    for _, row in tqdm(phenotype.iterrows(), total=len(phenotype)):
         subj = str(row["participant_id"])
-
         if not subj.startswith("sub-"):
-            # Check if participant_id starts with sub-
             subj = f"sub-{subj}"
 
-        # Find all correlation matrices for this subject
+        # --- Check and filter subject based on FD criteria ---
+        json_pat = f"{subj}_*feature-{feature}_*_timeseries.json"
+        json_files = list(Path(derivatives_path).rglob(json_pat))
+        if not json_files:
+            logger.warning(
+                f"No JSON file found for {subj}, excluding from analysis"
+            )
+            continue
+
+        fdmean = filter_and_extract_fd(json_files, subj)
+        if fdmean is None:
+            continue
+
+        # --- Check connectivity matrix files exist ---
         corr_pat = f"{subj}_*feature-{feature}_*desc-correlation_matrix.tsv"
         corr_files = list(Path(derivatives_path).rglob(corr_pat))
+        if not corr_files:
+            logger.warning(
+                f"No correlation matrix found for {subj},"
+                "excluding from analysis"
+            )
+            continue
 
-        # --- Average runs
+        # --- Average runs ---
         avg_mat = average_runs(corr_files)
-
-        # Create upper triangle mask without diagonal
         n_rois = avg_mat.shape[0]
+
+        # TODO: replace with nilearn mat_to_vec function
         mask_2d = np.triu(np.ones((n_rois, n_rois), dtype=bool), k=1)
 
-        # Flatten upper triangle for CWAS
-        flattened_matrices.append(avg_mat[mask_2d])
-        valid_subject_indices.append(idx)
+        # All checks passed: store result explicitly based on participant_id
+        records.append(
+            {
+                "participant_id": row[
+                    "participant_id"
+                ],  # use original id from phenotype
+                "flattened": avg_mat[mask_2d],
+                "mean_fd": fdmean,
+            }
+        )
 
-        # --- FDMean extraction ---
-        json_pat = f"{subj}_*feature-{feature}_*_timeseries.json"
+    if not records:
+        raise ValueError("No valid subjects remaining after processing.")
 
-        json_files = list(Path(derivatives_path).rglob(json_pat))
-        fdmean_values.append(fd_mean_extraction(json_files, subj))
+    conn_stack = np.vstack(
+        [r["flattened"] for r in records]
+    )  # shape: (n_subjects, n_edges)
 
-    # --- Build final conn_stack ---
-    conn_stack = np.vstack(flattened_matrices)  # shape: (n_subjects, n_edges)
-
-    # TODO: WARNING, this is tricky, should be changed!!!
-    phenotype = phenotype.loc[valid_subject_indices].reset_index(drop=True)
-    phenotype["mean_fd"] = fdmean_values
+    # Merge FDmean by participant_id
+    fd_df = pd.DataFrame(
+        {
+            "participant_id": [r["participant_id"] for r in records],
+            "mean_fd": [r["mean_fd"] for r in records],
+        }
+    )
+    valid_ids = fd_df["participant_id"].tolist()
+    phenotype = phenotype[
+        phenotype["participant_id"].isin(valid_ids)
+    ].reset_index(drop=True)
+    phenotype = phenotype.merge(fd_df, on="participant_id", how="left")
 
     logger.info(f"Processed {len(phenotype)} subjects")
     logger.info(
