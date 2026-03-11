@@ -59,4 +59,4 @@ docker run -v /Users/username/:/Users/username/ cwas4fmri:latest bids_dir \
           --verbosity \
           --debug
 ```
-*Note: To access your files more easily, you can bind in the path where the data, working directory and atlases are located with the `-v`flag*
+*Note: To access your files more easily, you can bind in the path where the working directory is located with the `-v` flag*
