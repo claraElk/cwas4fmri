@@ -1,6 +1,8 @@
 # 🧠 CWAS for resting-state fMRI
 
-This workflow is compliant with atlas-based connectomes from HALFpipe v1.3.0 or higher
+This workflow is compliant with atlas-based connectomes from HALFpipe v1.3.0 or higher.
+
+> *NOTE: This app is still under development; code is not guaranteed to be operational for all use cases. Unit tests are not implemented for now*
 
 # How to run cwas4fmri
 1. `git clone https://github.com/claraElk/cwas4fmri.git`
