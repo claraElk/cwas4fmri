@@ -62,3 +62,6 @@ docker run -v /Users/username/:/Users/username/ cwas4fmri:latest bids_dir \
           --debug
 ```
 *Note: To access your files more easily, you can bind in the path where the working directory is located with the `-v` flag*
+
+# References:
+- Code based on : https://github.com/claramoreau9/NeuropsychiatricCNVs_Connectivity
