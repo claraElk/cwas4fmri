@@ -3,12 +3,13 @@
 This workflow is compliant with atlas-based connectomes from HALFpipe v1.3.0 or higher
 
 # How to run cwas4fmri
-1. Create an environment
-2. Install the package:
+1. `git clone https://github.com/claraElk/cwas4fmri.git`
+2. Create a virtual environment
+3. Install the package:
 ```bash
 pip install .
 ```
-3. Then run the pipeline
+4. Then run the pipeline
 ```bash
 cwas4fmri bids_dir \
           output_dir \
@@ -39,5 +40,23 @@ For more details, run `cwas4fmri -h`
 | participant_id | diagnosis | gender | age |
 | ---------------|-----------|--------|-----|
 
-# Environment
-The environment will be automatically created and deleted with the job.
+# How to run cwas4fmri with docker (not fully tested yet)
+1. `git clone https://github.com/claraElk/cwas4fmri.git`
+2. `docker build -t cwas4fmri:latest`
+3. Run using docker
+```
+docker run -v /Users/username/:/Users/username/ cwas4fmri:latest bids_dir \
+          output_dir \
+          group \
+          --strategy \
+          --phenotype \
+          --atlas \
+          --atlas_file \
+          --patient \
+          --control \
+          --categorical_covariates \
+          --numerical_covariates \
+          --verbosity \
+          --debug
+```
+*Note: To access your files more easily, you can bind in the path where the data, working directory and atlases are located with the `-v`flag*
