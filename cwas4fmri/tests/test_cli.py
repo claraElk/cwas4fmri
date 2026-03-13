@@ -17,14 +17,14 @@ import importlib.resources as pkg_resources
 def test_halfpipe(tmp_path: Path):
     data_path = Path(
         pkg_resources.files("cwas4fmri").joinpath(
-            "data/test_data/smoke_test_halfpipe_ds30"
+            "data/test_data/dataset-ds000030_downscaled_halfpipe1.2.3dev"
         )
     )
     atlas_label = "schaefer400"
     dseg_path = data_path / "atlas" / "atlas-Schaefer2018Combined_dseg.nii.gz"
 
-    bids_dir = tmp_path / "bids"
-    bids_dir.mkdir()
+    bids_dir = tmp_path / data_path / "derivatives"
+    
     output_dir = tmp_path / "output"
     output_dir.mkdir()
 
