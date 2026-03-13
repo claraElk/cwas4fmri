@@ -21,10 +21,10 @@ def test_halfpipe(tmp_path: Path):
         )
     )
     atlas_label = "schaefer400"
-    dseg_path = data_path / "atlas" / "atlas-Schaefer2018Combined_dseg.nii.gz"
+    dseg_path = data_path / "atlas" / "atlas-Schaefer2018Combined_dseg.tsv"
 
     bids_dir = tmp_path / data_path / "derivatives"
-    
+
     output_dir = tmp_path / "output"
     output_dir.mkdir()
 
