@@ -1,7 +1,8 @@
-from cwas4fmri.utils.tools import filter_and_extract_fd
+from cwas4fmri.utils.tools import filter_and_extract_fd, average_runs
 import json
 import numpy as np
 import tempfile
+import pandas as pd
 import os
 
 
@@ -77,3 +78,38 @@ def test_filter_and_extract_fd():
 
     # Clean up
     os.remove(tmp_json_path)
+
+
+def test_average_runs():
+    np.random.seed(0)
+
+    # Create symmetrical matrix with 5 ROIs (10 edges)
+    n_rois = 5
+    n_edges = n_rois * (n_rois - 1) // 2
+    data = np.random.rand(3, n_edges)  # 3 runs
+
+    temp_files = []
+
+    # Save runs
+    for i in range(3):
+        with tempfile.NamedTemporaryFile(
+            mode="w+", suffix=".tsv", delete=False
+        ) as tmp:
+            pd.DataFrame(data[i]).to_csv(
+                tmp.name, sep="\t", index=False, header=False
+            )
+            temp_files.append(tmp.name)
+
+    averaged_data = average_runs(temp_files)
+
+    # expected result
+    expected = np.nanmean(data, axis=0)[:, None]
+
+    # check shape
+    assert averaged_data.shape == expected.shape
+
+    # check values
+    np.testing.assert_allclose(averaged_data, expected)
+
+    for f in temp_files:
+        os.remove(f)
