@@ -48,7 +48,7 @@ def test_halfpipe(tmp_path: Path):
         dict(
             participant_id=subjects,
             age=np.random.uniform(18, 80, len(subjects)),
-            gender=np.random.choice(["m", "f"], len(subjects)),
+            gender=np.random.choice(["M", "F"], len(subjects)),
             diagnosis=np.random.choice(["case", "control"], len(subjects)),
             numerical_covariates=np.random.uniform(0, 10, len(subjects)),
             categorical_covariates=np.random.choice(
