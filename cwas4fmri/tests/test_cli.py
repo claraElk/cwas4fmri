@@ -1,6 +1,7 @@
 """
 Smoke test of cwas4fmri.
 """
+
 import json
 import random
 
@@ -27,32 +28,57 @@ def create_fake_dataset(tmp_path: Path):
         np.fill_diagonal(mat, 1)  # Set diagonal to 1
 
         # Save as TSV
-        out_path = halfpipe_dir / f"{subj_id}" / "func" / "task-rest"/ f"{subj_id}_task-rest-ses-01_feature-test_atlas-Schaefer2018Combined_desc-correlation_matrix.tsv"
+        out_path = (
+            halfpipe_dir
+            / f"{subj_id}"
+            / "func"
+            / "task-rest"
+            / f"{subj_id}_task-rest-ses-01_feature-test_"
+            "atlas-Schaefer2018Combined_desc-correlation_matrix.tsv"
+        )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(mat).to_csv(out_path, sep="\t", index=False, header=False)
 
         # Create corresponding JSON with FDMean and FDMax
-        json_path = halfpipe_dir / f"{subj_id}" / "func" / "task-rest"/ f"{subj_id}_task-rest-ses-01_feature-test_atlas-Schaefer2018Combined_timeseries.json"
-        json_data = {"FDMean": random.randrange(0, 1), "FDMax": random.randrange(0, 4)}
+        json_path = (
+            halfpipe_dir
+            / f"{subj_id}"
+            / "func"
+            / "task-rest"
+            / f"{subj_id}_task-rest-ses-01_feature-test_"
+            "atlas-Schaefer2018Combined_timeseries.json"
+        )
+        json_data = {
+            "FDMean": random.randrange(0, 1),
+            "FDMax": random.randrange(0, 4),
+        }
         with open(json_path, "w") as f:
             json.dump(json_data, f)
-        
+
     # Create a participants.tsv file
     participants_path = tmp_path / "participants.tsv"
     participant_data = {
         "participant_id": [f"sub-{i:02d}" for i in range(n_subjects)],
-        "diagnosis": ["SCHZ" if i < n_subjects // 2 else "CONTROL" for i in range(n_subjects)],
+        "diagnosis": [
+            "SCHZ" if i < n_subjects // 2 else "CONTROL"
+            for i in range(n_subjects)
+        ],
         "age": np.random.randint(20, 60, size=n_subjects),
         "gender": ["M" if i % 2 == 0 else "F" for i in range(n_subjects)],
     }
-    pd.DataFrame(participant_data).to_csv(participants_path, sep="\t", index=False)
+    pd.DataFrame(participant_data).to_csv(
+        participants_path, sep="\t", index=False
+    )
 
     # Create a fake atlas dseg file
     atlas_dir = tmp_path / "atlases"
     atlas_dir.mkdir(parents=True, exist_ok=True)
     dseg_path = atlas_dir / "atlas-Schaefer2018Combined_dseg.tsv"
     dseg_data = np.arange(1, n_rois + 1).reshape(-1, 1)
-    pd.DataFrame(dseg_data).to_csv(dseg_path, sep="\t", index=True, header=False)
+    pd.DataFrame(dseg_data).to_csv(
+        dseg_path, sep="\t", index=True, header=False
+    )
+
 
 def test_cli(tmp_path: Path):
 
@@ -68,7 +94,6 @@ def test_cli(tmp_path: Path):
 
     phenotypes_path = tmp_path / "participants.tsv"
 
-    
     parser = global_parser()
 
     argv = [
@@ -86,7 +111,7 @@ def test_cli(tmp_path: Path):
         "--patient",
         "SCHZ",
         "--control",
-        "CONTROL"
+        "CONTROL",
     ]
 
     args = parser.parse_args(argv)
