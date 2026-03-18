@@ -1,8 +1,9 @@
 """
 Smoke test of cwas4fmri.
 """
+import json
+import random
 
-import pytest
 import pandas as pd
 import numpy as np
 
@@ -10,55 +11,64 @@ from cwas4fmri.run import global_parser
 from pathlib import Path
 from cwas4fmri.workflow import workflow
 
-import importlib.resources as pkg_resources
 
+def create_fake_dataset(tmp_path: Path):
+    # Create fake symmetric connectivity matrices for 10 subjects
+    halfpipe_dir = tmp_path / "derivatives" / "halfpipe"
+    halfpipe_dir.mkdir(parents=True, exist_ok=True)
+    print(halfpipe_dir)
 
-@pytest.mark.smoke
-def test_halfpipe(tmp_path: Path):
-    data_path = Path(
-        pkg_resources.files("cwas4fmri").joinpath(
-            "data/test_data/dataset-ds000030_downscaled_halfpipe1.2.3dev"
-        )
-    )
-    atlas_label = "schaefer400"
-    dseg_path = data_path / "atlas" / "atlas-Schaefer2018Combined_dseg.tsv"
+    n_subjects = 10
+    n_rois = 5
+    for i in range(n_subjects):
+        subj_id = f"sub-{i:02d}"
+        mat = np.random.rand(n_rois, n_rois)
+        mat = (mat + mat.T) / 2  # Make it symmetric
+        np.fill_diagonal(mat, 1)  # Set diagonal to 1
 
-    bids_dir = tmp_path / data_path / "derivatives"
+        # Save as TSV
+        out_path = halfpipe_dir / f"{subj_id}" / "func" / "task-rest"/ f"{subj_id}_task-rest-ses-01_feature-test_atlas-Schaefer2018Combined_desc-correlation_matrix.tsv"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(mat).to_csv(out_path, sep="\t", index=False, header=False)
+
+        # Create corresponding JSON with FDMean and FDMax
+        json_path = halfpipe_dir / f"{subj_id}" / "func" / "task-rest"/ f"{subj_id}_task-rest-ses-01_feature-test_atlas-Schaefer2018Combined_timeseries.json"
+        json_data = {"FDMean": random.randrange(0, 1), "FDMax": random.randrange(0, 4)}
+        with open(json_path, "w") as f:
+            json.dump(json_data, f)
+        
+    # Create a participants.tsv file
+    participants_path = tmp_path / "participants.tsv"
+    participant_data = {
+        "participant_id": [f"sub-{i:02d}" for i in range(n_subjects)],
+        "diagnosis": ["SCHZ" if i < n_subjects // 2 else "CONTROL" for i in range(n_subjects)],
+        "age": np.random.randint(20, 60, size=n_subjects),
+        "gender": ["M" if i % 2 == 0 else "F" for i in range(n_subjects)],
+    }
+    pd.DataFrame(participant_data).to_csv(participants_path, sep="\t", index=False)
+
+    # Create a fake atlas dseg file
+    atlas_dir = tmp_path / "atlases"
+    atlas_dir.mkdir(parents=True, exist_ok=True)
+    dseg_path = atlas_dir / "atlas-Schaefer2018Combined_dseg.tsv"
+    dseg_data = np.arange(1, n_rois + 1).reshape(-1, 1)
+    pd.DataFrame(dseg_data).to_csv(dseg_path, sep="\t", index=True, header=False)
+
+def test_cli(tmp_path: Path):
+
+    create_fake_dataset(tmp_path)
+
+    atlas_label = "Schaefer2018Combined"
+    dseg_path = tmp_path / "atlases" / "atlas-Schaefer2018Combined_dseg.tsv"
+
+    bids_dir = tmp_path / "derivatives"
 
     output_dir = tmp_path / "output"
     output_dir.mkdir()
 
-    subjects = [
-        f"sub-{i}"
-        for i in [
-            "10159",
-            "10171",
-            "10189",
-            "10206",
-            "10217",
-            "10225",
-            "10227",
-            "10228",
-            "10235",
-            "10249",
-        ]
-    ]
+    phenotypes_path = tmp_path / "participants.tsv"
 
-    phenotypes = pd.DataFrame(
-        dict(
-            participant_id=subjects,
-            age=np.random.uniform(18, 80, len(subjects)),
-            gender=np.random.choice(["M", "F"], len(subjects)),
-            diagnosis=np.random.choice(["case", "control"], len(subjects)),
-            numerical_covariates=np.random.uniform(0, 10, len(subjects)),
-            categorical_covariates=np.random.choice(
-                ["Site1", "Site2"], len(subjects)
-            ),
-        )
-    )
-    phenotypes_path = bids_dir / "participants.tsv"
-    phenotypes.to_csv(phenotypes_path, sep="\t", index=False)
-
+    
     parser = global_parser()
 
     argv = [
@@ -66,7 +76,7 @@ def test_halfpipe(tmp_path: Path):
         str(output_dir),
         "group",
         "--strategy",
-        "corrMatrix1",
+        "test",
         "--phenotype",
         str(phenotypes_path),
         "--atlas",
@@ -74,13 +84,9 @@ def test_halfpipe(tmp_path: Path):
         "--atlas_file",
         str(dseg_path),
         "--patient",
-        "case",
+        "SCHZ",
         "--control",
-        "control",
-        "--categorical_covariates",
-        "categorical_covariates",
-        "--numerical_covariates",
-        "numerical_covariates",
+        "CONTROL"
     ]
 
     args = parser.parse_args(argv)
